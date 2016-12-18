@@ -46,7 +46,7 @@ entity axiliteslave is
 end entity axiliteslave;
 
 architecture rtl of axiliteslave is
-  
+
   constant LOA_BUS_ADDR_WL : integer := 15;
   constant LOA_BUS_DATA_WL : integer := 16;
   
@@ -275,7 +275,7 @@ begin
   end process;
   
   process( loa_bus.all ) is
-    variable addr : std_logic_vector(S_AXI_ADDR_WIDTH -1 downto 0);
+    variable addr : std_logic_vector(LOA_BUS_ADDR_WL -1 downto 0);
   begin
     addr := ( others => '0' );
     --

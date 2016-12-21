@@ -51,11 +51,11 @@ architecture rtl of axiliteslave is
   constant LOA_BUS_DATA_WL : integer := 16;
   
   type loa_bus_type is record
-    bus_r_addr  : std_logic_vector(LOA_BUS_ADDR_WL -1 downto 0);
-    bus_w_addr  : std_logic_vector(LOA_BUS_ADDR_WL -1 downto 0);
-    bus_do      : std_logic_vector(LOA_BUS_DATA_WL -1 downto 0);
-    bus_re      : std_logic;
-    bus_we      : std_logic;
+    addr  : std_logic_vector(LOA_BUS_ADDR_WL -1 downto 0);
+    do    : std_logic_vector(LOA_BUS_DATA_WL -1 downto 0);
+    di    : std_logic_vector(LOA_BUS_DATA_WL -1 downto 0);
+    re    : std_logic;
+    we    : std_logic;
   end record;
   
   signal loa_bus : loa_bus_type;
@@ -164,14 +164,14 @@ begin
   -- These registers are cleared when reset (active low) is applied.
   -- Slave register write enable is asserted when valid address and data are available
   -- and the slave is ready to accept the write address and write data.
-  loa_bus.bus_we <= w_ready and s_axi_lite_i.w_data_ch.w_valid and aw_ready and s_axi_lite_i.w_addr_ch.aw_valid;
+  loa_bus.we <= w_ready and s_axi_lite_i.w_data_ch.w_valid and aw_ready and s_axi_lite_i.w_addr_ch.aw_valid;
 
-  process ( loa_bus.bus_we, aw_addr )
+  process ( loa_bus.we, aw_addr )
     variable addr :std_logic_vector(LOA_BUS_ADDR_WL -1 downto 0);
   begin
     addr := ( others => '0' );
     --
-    if ( loa_bus.bus_we = '1' ) then
+    if ( loa_bus.we = '1' ) then
       addr := aw_addr( ADDR_LSB + LOA_BUS_ADDR_WL downto ADDR_LSB );
     end if;
     --
@@ -255,20 +255,21 @@ begin
   -- Implement memory mapped register select and read logic generation
   -- Slave register read enable is asserted when valid address is available
   -- and the slave is ready to accept the read address.
-  loa_bus.bus_re <= ar_ready and s_axi_lite_i.r_addr_ch.ar_valid and ( not r_valid ) ;
+  loa_bus.re <= ar_ready and s_axi_lite_i.r_addr_ch.ar_valid and ( not r_valid ) ;
 
   -- Output register or memory read data
-  process( loa_bus.bus_re, bus_i.data ) is
+  process( loa_bus.re, bus_i.data ) is
     variable data : std_logic_vector(S_AXI_DATA_WIDTH -1 downto 0);
   begin
     data    := ( others => '0' );
     --
-    if ( loa_bus.bus_re = '1' ) then
+    if ( loa_bus.re = '1' ) then
       -- When there is a valid read address (s_axi_lite_i.r_addr_ch.ar_valid) with
       -- acceptance of read address by the slave (ar_ready),
       -- output the read dada
       -- Read address mux
-      data  := bus_i.data;     -- loa bus read data
+      data  := loa_bus.di;     -- loa bus read data
+      -- FIXME: maybe broken, due to missing latched signal input before
     end if;
     --
     r_data  <= data;
@@ -279,17 +280,19 @@ begin
   begin
     addr := ( others => '0' );
     --
-    if ( loa_bus.bus_we = '1' ) then
-      addr := loa_bus.bus_w_addr;
-    elsif ( loa_bus.bus_re = '1' ) then
-      addr := loa_bus.bus_r_addr;
+    if ( loa_bus.we = '1' ) then
+      addr := aw_addr;
+    elsif ( loa_bus.re = '1' ) then
+      addr := ar_addr;
     end if;
     --
-    bus_o.addr <= addr;
+    loa_bus.addr <= addr;
   end process ;
   
-  bus_o.data  <= loa_bus.bus_do;
-  bus_o.re    <= loa_bus.bus_re;
-  bus_o.we    <= loa_bus.bus_we;
+  bus_o.addr  <= loa_bus.addr;
+  bus_o.data  <= loa_bus.do;
+  loa_bus.di  <= bus_i.data;
+  bus_o.re    <= loa_bus.re;
+  bus_o.we    <= loa_bus.we;
   
 end architecture rtl;
